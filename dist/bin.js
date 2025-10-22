@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { register } from "node:module";
 import * as path from "node:path";
 import * as url from "node:url";
