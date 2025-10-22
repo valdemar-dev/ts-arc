@@ -1,0 +1,25 @@
+{
+    "name": "ts-run",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "A simple typescript runtime.",
+    "main": "dist/bin.js",
+    "bin": {
+        "ts-run": "./dist/bin.js"
+    },
+    "scripts": {
+        "build": "npx esbuild ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "devDependencies": {
+        "@types/node": "^24.9.1"
+    },
+    "dependencies": {
+        "esbuild": "^0.25.11"
+    },
+    "files": [
+        "dist"
+    ]
+}
