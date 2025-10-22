@@ -24,38 +24,52 @@ const scriptUrl = url.pathToFileURL(scriptPath).href;
 
 process.argv = [process.argv[0], script, ...process.argv.slice(3)];
 
-function stripJsonComments(data: string): string {
-    let index = 0;
-    let out = '';
-    let inString = false;
-    while (index < data.length) {
-        const ch = data[index];
-        if (inString) {
-            if (ch === '"' && data[index - 1] !== '\\') {
-                inString = false;
-            }
-            out += ch;
-            index++;
-        } else {
-            if (ch === '"') {
-                inString = true;
-                out += ch;
-                index++;
-            } else if (ch === '/' && data[index + 1] === '/') {
-                index += 2;
-                while (index < data.length && data[index] !== '\n') index++;
-            } else if (ch === '/' && data[index + 1] === '*') {
-                index += 2;
-                while (index < data.length && !(data[index - 1] === '*' && data[index] === '/')) index++;
-                if (index < data.length) index++;
-            } else {
-                out += ch;
-                index++;
-            }
+/** We want to remove naughty little JSON comments that people sometimes put in their tsconfig. They shouldn't, I think; but they do. */
+function stripJsonComments(input: string): string {
+    let output = '';
+    let insideString = false;
+    let i = 0;
+
+    while (i < input.length) {
+        const char = input[i];
+
+        if (insideString) {
+            output += char;
+            if (char === '"' && input[i - 1] !== '\\') insideString = false; // end of string unless escaped
+            i++;
+            continue;
         }
+
+        if (char === '"') {
+            insideString = true; // entering string literal
+            output += char;
+            i++;
+            continue;
+        }
+
+        if (char === '/' && input[i + 1] === '/') {
+            i += 2;
+            while (i < input.length && input[i] !== '\n') i++; // skip single-line comment
+            continue;
+        }
+
+        if (char === '/' && input[i + 1] === '*') {
+            i += 2;
+            while (
+                i < input.length &&
+                !(input[i - 1] === '*' && input[i] === '/')
+            ) i++; // skip multi-line comment until closing */
+            if (i < input.length) i++; // move past closing '/'
+            continue;
+        }
+
+        output += char;
+        i++;
     }
-    return out;
+
+    return output;
 }
+
 
 function loadConfig(filePath: string): any {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -68,6 +82,7 @@ function loadConfig(filePath: string): any {
 
     const extendsVal = config.extends;
     const tsconfigDir = path.dirname(filePath);
+    
     let extendsPath: string;
 
     if (extendsVal.startsWith('./') || extendsVal.startsWith('../')) {
@@ -85,12 +100,15 @@ function loadConfig(filePath: string): any {
 
     const baseConfig = loadConfig(extendsPath);
     const merged = { ...baseConfig, ...config };
+    
     merged.compilerOptions = { ...(baseConfig.compilerOptions || {}), ...(config.compilerOptions || {}) };
+    
     return merged;
 }
 
 function findTsConfig(dir: string): string | null {
     let current = dir;
+    
     while (current !== path.parse(current).root) {
         const tsconfigPath = path.join(current, 'tsconfig.json');
         if (fs.existsSync(tsconfigPath)) {
@@ -98,10 +116,12 @@ function findTsConfig(dir: string): string | null {
         }
         current = path.dirname(current);
     }
+    
     return null;
 }
 
 const tsconfigPath = findTsConfig(path.dirname(scriptPath));
+
 let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]> } = { baseUrl: null, paths: {} };
 
 if (tsconfigPath) {
@@ -109,6 +129,7 @@ if (tsconfigPath) {
     const compilerOptions = mergedConfig.compilerOptions || {};
     const tsconfigDir = path.dirname(tsconfigPath);
     const baseUrlStr = compilerOptions.baseUrl;
+    
     tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
     tsArcConfig.paths = compilerOptions.paths || {};
 }

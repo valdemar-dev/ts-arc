@@ -8,7 +8,7 @@
         "ts-arc": "./dist/bin.js"
     },
     "scripts": {
-        "build": "npx esbuild ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm"
+        "build": "npx esbuild ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm --minify=true"
     },
     "keywords": [],
     "author": "",
