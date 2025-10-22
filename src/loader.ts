@@ -38,7 +38,7 @@ export async function resolve(
                             const fakeParent = url.pathToFileURL(path.join(effectiveBase, 'dummy.ts')).href;
                             
                             try {
-                                const resolved = await nextResolve(`./${newSpecifier}`, { parentURL: fakeParent });
+                                const resolved = await resolve(`./${newSpecifier}`, { parentURL: fakeParent }, nextResolve);
                                 
                                 return { ...resolved, shortCircuit: true };
                             } catch (error: any) {
@@ -55,7 +55,7 @@ export async function resolve(
                 const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
                 
                 try {
-                    const resolved = await nextResolve(`./${specifier}`, { parentURL: fakeParent });
+                    const resolved = await resolve(`./${specifier}`, { parentURL: fakeParent }, nextResolve);
                     
                     return { ...resolved, shortCircuit: true };
                 } catch (error: any) {
