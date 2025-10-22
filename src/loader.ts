@@ -121,13 +121,11 @@ export async function load(
     context: { format?: string },
     nextLoad: (url: string, context: { format?: string }) => Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }>
 ): Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }> {
-    let esbuildLoader: 'ts' | 'tsx' = 'ts';
-    
-    if (urlStr.endsWith('.tsx')) {
-        esbuildLoader = 'tsx';
-    } else {
+    if (!urlStr.endsWith('.ts') && !urlStr.endsWith('.tsx')) {
         return nextLoad(urlStr, context);
     }
+
+    const esbuildLoader = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
 
     const filePath = url.fileURLToPath(urlStr);
     const rawSource = fs.readFileSync(filePath, 'utf8');
