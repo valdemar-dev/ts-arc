@@ -1,11 +1,11 @@
 {
-    "name": "ts-run",
+    "name": "ts-arc",
     "version": "1.0.0",
     "type": "module",
     "description": "A simple typescript runtime.",
     "main": "dist/bin.js",
     "bin": {
-        "ts-run": "./dist/bin.js"
+        "ts-arc": "./dist/bin.js"
     },
     "scripts": {
         "build": "npx esbuild ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm"
