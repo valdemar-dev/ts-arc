@@ -13,13 +13,13 @@
     "keywords": [],
     "author": "",
     "license": "ISC",
-    "devDependencies": {
-        "@types/node": "^24.9.1"
-    },
     "dependencies": {
         "esbuild": "^0.25.11"
     },
     "files": [
         "dist"
-    ]
+    ],
+    "devDependencies": {
+        "@types/node": "^24.9.1"
+    }
 }
