@@ -11,7 +11,6 @@ const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const loaderPath = path.join(__dirname, "loader.js");
-register(loaderPath, url.pathToFileURL(__dirname).href);
 
 const script = process.argv[2];
 if (!script) {
@@ -69,7 +68,6 @@ function stripJsonComments(input: string): string {
 
     return output;
 }
-
 
 function loadConfig(filePath: string): any {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -135,7 +133,8 @@ if (tsconfigPath) {
     tsArcConfig.tsconfigDir = tsconfigDir;
 }
 
-global.__tsArcConfig = tsArcConfig;
+const loaderUrl = url.pathToFileURL(loaderPath).href;
+register(loaderUrl, { data: tsArcConfig });
 
 import(scriptUrl).catch((err) => {
     console.error(err);

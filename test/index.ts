@@ -1,4 +1,7 @@
+import test from "@/test";
+
 import path from "path";
 
-console.log(path.join("hi", "hi"));
-console.log("hello from typescript");
+test()
+
+console.log("Joined Path:", path.join("test", "test-2"));

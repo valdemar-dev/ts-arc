@@ -4,6 +4,12 @@ import * as path from 'path';
 import * as url from 'url';
 import { transformSync } from 'esbuild';
 
+let config: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null };
+
+export function initialize(initContext: any) {
+    config = initContext;
+}
+
 export async function resolve(
     specifier: string,
     context: { parentURL?: string },
@@ -12,7 +18,6 @@ export async function resolve(
     const isRelative = specifier.startsWith('.') || specifier.startsWith('/');
 
     if (!isRelative) {
-        const config = (global as any).__tsArcConfig;
         if (config) {
             const { baseUrl, paths, tsconfigDir } = config;
 
@@ -23,7 +28,13 @@ export async function resolve(
                     const prefix = key.slice(0, -2);
                     
                     if (specifier.startsWith(prefix)) {
-                        capture = specifier.slice(prefix.length);
+                        const afterPrefix = specifier.slice(prefix.length);
+                        if (afterPrefix === '' || afterPrefix.startsWith('/')) {
+                            capture = afterPrefix;
+                            if (capture.startsWith('/')) {
+                                capture = capture.slice(1);
+                            }
+                        }
                     }
                 } else if (specifier === key) {
                     capture = '';
@@ -125,7 +136,7 @@ export async function load(
         return nextLoad(urlStr, context);
     }
 
-    const esbuildLoader = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
+    const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
 
     const filePath = url.fileURLToPath(urlStr);
     const rawSource = fs.readFileSync(filePath, 'utf8');
