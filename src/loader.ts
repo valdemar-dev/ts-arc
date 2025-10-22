@@ -147,6 +147,9 @@ export async function load(
         target: `node${process.versions.node}`,
         sourcemap: 'inline',
         sourcefile: filePath,
+        banner: `
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);`,
     });
     
     return {
