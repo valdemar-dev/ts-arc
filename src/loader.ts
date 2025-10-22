@@ -9,51 +9,59 @@ export async function resolve(
     context: { parentURL?: string },
     nextResolve: (specifier: string, context: { parentURL?: string }) => Promise<{ url: string; format?: string; shortCircuit?: boolean }>
 ): Promise<{ url: string; format?: string; shortCircuit?: boolean }> {
-    if (specifier.startsWith('.') || specifier.startsWith('/')) {
-        return nextResolve(specifier, context);
-    }
+    const isRelative = specifier.startsWith('.') || specifier.startsWith('/');
 
-    const config = (global as any).__tsArcConfig;
-    if (config) {
-        const { baseUrl, paths } = config;
+    if (!isRelative) {
+        const config = (global as any).__tsArcConfig;
+        if (config) {
+            const { baseUrl, paths, tsconfigDir } = config;
 
-        for (const key of Object.keys(paths)) {
-            let capture: string | null = null;
-            if (key.endsWith('/*')) {
-                const prefix = key.slice(0, -2);
-                if (specifier.startsWith(prefix)) {
-                    capture = specifier.slice(prefix.length);
+            for (const key of Object.keys(paths)) {
+                let capture: string | null = null;
+                
+                if (key.endsWith('/*')) {
+                    const prefix = key.slice(0, -2);
+                    
+                    if (specifier.startsWith(prefix)) {
+                        capture = specifier.slice(prefix.length);
+                    }
+                } else if (specifier === key) {
+                    capture = '';
                 }
-            } else if (specifier === key) {
-                capture = '';
-            }
 
-            if (capture !== null) {
-                for (const target of paths[key]) {
-                    const newSpecifier = target.replace(/\*/g, capture);
-                    if (baseUrl) {
-                        const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
-                        try {
-                            const resolved = await nextResolve(`./${newSpecifier}`, { parentURL: fakeParent });
-                            return { ...resolved, shortCircuit: true };
-                        } catch (error: any) {
-                            if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-                                throw error;
+                if (capture !== null) {
+                    for (const target of paths[key]) {
+                        const newSpecifier = target.replace(/\*/g, capture);
+                        const effectiveBase = baseUrl ?? tsconfigDir;
+                        
+                        if (effectiveBase) {
+                            const fakeParent = url.pathToFileURL(path.join(effectiveBase, 'dummy.ts')).href;
+                            
+                            try {
+                                const resolved = await nextResolve(`./${newSpecifier}`, { parentURL: fakeParent });
+                                
+                                return { ...resolved, shortCircuit: true };
+                            } catch (error: any) {
+                                if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                                    throw error;
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        if (baseUrl) {
-            const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
-            try {
-                const resolved = await nextResolve(`./${specifier}`, { parentURL: fakeParent });
-                return { ...resolved, shortCircuit: true };
-            } catch (error: any) {
-                if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-                    throw error;
+            if (baseUrl) {
+                const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
+                
+                try {
+                    const resolved = await nextResolve(`./${specifier}`, { parentURL: fakeParent });
+                    
+                    return { ...resolved, shortCircuit: true };
+                } catch (error: any) {
+                    if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                        throw error;
+                    }
                 }
             }
         }
@@ -61,7 +69,8 @@ export async function resolve(
 
     try {
         const resolved = await nextResolve(specifier, context);
-        return resolved;
+        
+        return { ...resolved, shortCircuit: true };
     } catch (error: any) {
         if (error.code !== 'ERR_MODULE_NOT_FOUND') {
             throw error;
@@ -70,6 +79,17 @@ export async function resolve(
 
     try {
         const resolved = await nextResolve(specifier + '.ts', context);
+        
+        return { ...resolved, shortCircuit: true };
+    } catch (error: any) {
+        if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+            throw error;
+        }
+    }
+
+    try {
+        const resolved = await nextResolve(specifier + '.tsx', context);
+        
         return { ...resolved, shortCircuit: true };
     } catch (error: any) {
         if (error.code !== 'ERR_MODULE_NOT_FOUND') {
@@ -79,6 +99,17 @@ export async function resolve(
 
     try {
         const resolved = await nextResolve(specifier + '/index.ts', context);
+        
+        return { ...resolved, shortCircuit: true };
+    } catch (error: any) {
+        if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+            throw error;
+        }
+    }
+
+    try {
+        const resolved = await nextResolve(specifier + '/index.tsx', context);
+        
         return { ...resolved, shortCircuit: true };
     } catch (error: any) {
         throw error;
@@ -91,9 +122,8 @@ export async function load(
     nextLoad: (url: string, context: { format?: string }) => Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }>
 ): Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }> {
     let esbuildLoader: 'ts' | 'tsx' = 'ts';
-    if (urlStr.endsWith('.ts')) {
-        // Default
-    } else if (urlStr.endsWith('.tsx')) {
+    
+    if (urlStr.endsWith('.tsx')) {
         esbuildLoader = 'tsx';
     } else {
         return nextLoad(urlStr, context);
@@ -101,6 +131,7 @@ export async function load(
 
     const filePath = url.fileURLToPath(urlStr);
     const rawSource = fs.readFileSync(filePath, 'utf8');
+    
     const { code } = transformSync(rawSource, {
         loader: esbuildLoader,
         format: 'esm',
@@ -108,6 +139,7 @@ export async function load(
         sourcemap: 'inline',
         sourcefile: filePath,
     });
+    
     return {
         format: 'module',
         source: code,

@@ -122,7 +122,7 @@ function findTsConfig(dir: string): string | null {
 
 const tsconfigPath = findTsConfig(path.dirname(scriptPath));
 
-let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]> } = { baseUrl: null, paths: {} };
+let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = { baseUrl: null, paths: {}, tsconfigDir: null };
 
 if (tsconfigPath) {
     const mergedConfig = loadConfig(tsconfigPath);
@@ -132,6 +132,7 @@ if (tsconfigPath) {
     
     tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
     tsArcConfig.paths = compilerOptions.paths || {};
+    tsArcConfig.tsconfigDir = tsconfigDir;
 }
 
 global.__tsArcConfig = tsArcConfig;
