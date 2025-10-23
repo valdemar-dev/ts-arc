@@ -136,6 +136,8 @@ if (tsconfigPath) {
 const loaderUrl = url.pathToFileURL(loaderPath).href;
 register(loaderUrl, { data: tsArcConfig });
 
+console.log("TS-ARC: Registered tsconfig as:", tsArcConfig);
+
 import(scriptUrl).catch((err) => {
     console.error(err);
     process.exit(1);

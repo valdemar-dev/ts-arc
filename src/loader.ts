@@ -7,6 +7,7 @@ import { transformSync } from 'esbuild';
 let config: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null };
 
 export function initialize(initContext: any) {
+    console.log("TS-ARC: Loader got init context:", initContext);
     config = initContext;
 }
 
