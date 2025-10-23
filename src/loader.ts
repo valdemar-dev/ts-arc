@@ -20,6 +20,8 @@ export async function resolve(
     if (!isRelative) {
         if (config) {
             const { baseUrl, paths, tsconfigDir } = config;
+            
+            console.debug("Resolving,", specifier, "with tsconfig:", config);
 
             for (const key of Object.keys(paths)) {
                 let capture: string | null = null;
