@@ -1,4 +1,133 @@
 #!/usr/bin/env node
-import*as m from"fs";import*as o from"path";import*as d from"url";import{transformSync as x}from"esbuild";let p={baseUrl:null,paths:{},tsconfigDir:null};function b(t){p=t}function y(){const{baseUrl:t,tsconfigDir:s}=p;return t?o.resolve(s??process.cwd(),t):null}async function g(t,s){const r=o.resolve(t,s),c=[r,r+".ts",r+".tsx",o.join(r,"index.ts"),o.join(r,"index.tsx"),o.join(r,"page.ts"),o.join(r,"page.tsx")];for(const a of c)try{if(m.existsSync(a)&&m.statSync(a).isFile())return{url:d.pathToFileURL(a).href}}catch{}throw Object.assign(new Error(`Cannot find module '${s}'`),{code:"ERR_MODULE_NOT_FOUND"})}async function P(t,s,r){let c=process.cwd();if(s.parentURL&&(c=o.dirname(d.fileURLToPath(s.parentURL))),t.startsWith("file://")){const n=d.fileURLToPath(t),i=o.dirname(n),u=o.basename(n),e=(o.extname(u),u);return{...await g(i,e),shortCircuit:!0}}if(t.startsWith(".")||t.startsWith("/"))return console.log("Attempting to resolve a path-like specifier:",t),{...await g(c,t),shortCircuit:!0};{console.log("Attempting to resolve non path-like specifier:",t);const{paths:n}=p,i=y();console.log("That specifiers effectiveBase is:",t);for(const e of Object.keys(n)){let l=null;const f=e.endsWith("/*"),v=f?e.slice(0,-2):e;if(f&&t.startsWith(v+"/")?l=t.slice(v.length+1):!f&&t===e&&(l=""),l!==null)for(const R of n[e]){const U=f?R.replace(/\*/g,l):R;if(i)try{return{...await g(i,U),shortCircuit:!0}}catch(h){if(h.code!=="ERR_MODULE_NOT_FOUND")throw h}}}if(i)try{return{...await g(i,t),shortCircuit:!0}}catch(e){if(e.code!=="ERR_MODULE_NOT_FOUND")throw e}return{...await r(t,s),shortCircuit:!0}}}async function w(t,s,r){if(!t.endsWith(".ts")&&!t.endsWith(".tsx"))return r(t,s);const c=t.endsWith(".tsx")?"tsx":"ts",a=d.fileURLToPath(t),n=m.readFileSync(a,"utf8"),{code:i}=x(n,{loader:c,format:"esm",target:`node${process.versions.node}`,sourcemap:"inline",sourcefile:a,banner:`
+
+// src/loader.ts
+import * as fs from "fs";
+import * as path from "path";
+import * as url from "url";
+import { transformSync } from "esbuild";
+var config = {
+  baseUrl: null,
+  paths: {},
+  tsconfigDir: null
+};
+function initialize(initContext) {
+  config = initContext;
+}
+function getEffectiveBase() {
+  const { baseUrl, tsconfigDir } = config;
+  if (baseUrl) {
+    return path.resolve(tsconfigDir ?? process.cwd(), baseUrl);
+  }
+  return null;
+}
+async function resolveLocal(baseDir, relativePath) {
+  const fullPath = path.resolve(baseDir, relativePath);
+  const candidates = [
+    fullPath,
+    fullPath + ".ts",
+    fullPath + ".tsx",
+    path.join(fullPath, "index.ts"),
+    path.join(fullPath, "index.tsx"),
+    path.join(fullPath, "page.ts"),
+    path.join(fullPath, "page.tsx")
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return { url: url.pathToFileURL(candidate).href };
+      }
+    } catch {
+    }
+  }
+  throw Object.assign(new Error(`Cannot find module '${relativePath}'`), { code: "ERR_MODULE_NOT_FOUND" });
+}
+async function resolve2(specifier, context, nextResolve) {
+  let parentPath = process.cwd();
+  if (context.parentURL) {
+    parentPath = path.dirname(url.fileURLToPath(context.parentURL));
+  }
+  if (specifier.startsWith("file://")) {
+    const filePath = url.fileURLToPath(specifier);
+    const dir = path.dirname(filePath);
+    const baseName = path.basename(filePath);
+    const relative = path.extname(baseName) ? baseName : baseName;
+    const resolved = await resolveLocal(dir, relative);
+    return { ...resolved, shortCircuit: true };
+  }
+  const isPathLike = specifier.startsWith(".") || specifier.startsWith("/");
+  if (isPathLike) {
+    console.log("Attempting to resolve a path-like specifier:", specifier);
+    const resolved = await resolveLocal(parentPath, specifier);
+    return { ...resolved, shortCircuit: true };
+  } else {
+    console.log("Attempting to resolve non path-like specifier:", specifier);
+    const { paths } = config;
+    const effectiveBase = getEffectiveBase();
+    console.log("That specifiers effectiveBase is:", specifier);
+    for (const key of Object.keys(paths)) {
+      let capture = null;
+      const isWildcard = key.endsWith("/*");
+      const prefix = isWildcard ? key.slice(0, -2) : key;
+      if (isWildcard && specifier.startsWith(prefix + "/")) {
+        capture = specifier.slice(prefix.length + 1);
+      } else if (!isWildcard && specifier === key) {
+        capture = "";
+      }
+      if (capture !== null) {
+        for (const target of paths[key]) {
+          const mapped = isWildcard ? target.replace(/\*/g, capture) : target;
+          if (effectiveBase) {
+            try {
+              const resolved2 = await resolveLocal(effectiveBase, mapped);
+              return { ...resolved2, shortCircuit: true };
+            } catch (error) {
+              if (error.code !== "ERR_MODULE_NOT_FOUND") {
+                throw error;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (effectiveBase) {
+      try {
+        const resolved2 = await resolveLocal(effectiveBase, specifier);
+        return { ...resolved2, shortCircuit: true };
+      } catch (error) {
+        if (error.code !== "ERR_MODULE_NOT_FOUND") {
+          throw error;
+        }
+      }
+    }
+    const resolved = await nextResolve(specifier, context);
+    return { ...resolved, shortCircuit: true };
+  }
+}
+async function load(urlStr, context, nextLoad) {
+  if (!urlStr.endsWith(".ts") && !urlStr.endsWith(".tsx")) {
+    return nextLoad(urlStr, context);
+  }
+  const esbuildLoader = urlStr.endsWith(".tsx") ? "tsx" : "ts";
+  const filePath = url.fileURLToPath(urlStr);
+  const rawSource = fs.readFileSync(filePath, "utf8");
+  const { code } = transformSync(rawSource, {
+    loader: esbuildLoader,
+    format: "esm",
+    target: `node${process.versions.node}`,
+    sourcemap: "inline",
+    sourcefile: filePath,
+    banner: `
 import { createRequire } from 'module';
-const require = createRequire(import.meta.url);`});return{format:"module",source:i,shortCircuit:!0}}export{b as initialize,w as load,P as resolve};
+const require = createRequire(import.meta.url);`
+  });
+  return {
+    format: "module",
+    source: code,
+    shortCircuit: true
+  };
+}
+export {
+  initialize,
+  load,
+  resolve2 as resolve
+};

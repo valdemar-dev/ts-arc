@@ -5,10 +5,10 @@
     "description": "A simple typescript runtime.",
     "main": "dist/bin.js",
     "bin": {
-        "ts-arc": "./dist/bin.js"
+        "ts-arc": "./dist/cli.js"
     },
     "scripts": {
-        "build": "npx esbuild ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm --minify=true"
+        "build": "npx esbuild ./src/cli.ts ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm --bundle --external:fs --external:path --external:esbuild"
     },
     "keywords": [],
     "author": "",

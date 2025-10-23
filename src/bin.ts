@@ -1,27 +1,15 @@
-#!/usr/bin/env node
+import * as fs from 'node:fs';
 import { register } from 'node:module';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import * as url from 'node:url';
-import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
-
-const require = createRequire(import.meta.url);
 
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const loaderPath = path.join(__dirname, "loader.js");
 
-const script = process.argv[2];
-if (!script) {
-    console.error('Usage: node bin.js <script.ts> [args...]');
-    process.exit(1);
-}
-
-const scriptPath = path.resolve(script);
-const scriptUrl = url.pathToFileURL(scriptPath).href;
-
-process.argv = [process.argv[0], script, ...process.argv.slice(3)];
+const require = createRequire(import.meta.url);
 
 /** We want to remove naughty little JSON comments that people sometimes put in their tsconfig. They shouldn't, I think; but they do. */
 function stripJsonComments(input: string): string {
@@ -118,27 +106,34 @@ function findTsConfig(dir: string): string | null {
     return null;
 }
 
-const tsconfigPath = findTsConfig(path.dirname(scriptPath));
 
 let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = { baseUrl: null, paths: {}, tsconfigDir: null };
 
-if (tsconfigPath) {
-    const mergedConfig = loadConfig(tsconfigPath);
-    const compilerOptions = mergedConfig.compilerOptions || {};
-    const tsconfigDir = path.dirname(tsconfigPath);
-    const baseUrlStr = compilerOptions.baseUrl;
-    
-    tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
-    tsArcConfig.paths = compilerOptions.paths || {};
-    tsArcConfig.tsconfigDir = tsconfigDir;
+export async function registerLoader() {
+    const loaderUrl = url.pathToFileURL(loaderPath).href;
+    register(loaderUrl, { data: tsArcConfig });
 }
 
-const loaderUrl = url.pathToFileURL(loaderPath).href;
-register(loaderUrl, { data: tsArcConfig });
-
-console.log("TS-ARC: Registered tsconfig as:", tsArcConfig);
-
-import(scriptUrl).catch((err) => {
-    console.error(err);
-    process.exit(1);
-});
+export async function loadModule(scriptUrl: string) {
+    const scriptPath = url.fileURLToPath(scriptUrl);
+    
+    const tsconfigPath = findTsConfig(path.dirname(scriptPath));
+    
+    if (tsconfigPath) {
+        const mergedConfig = loadConfig(tsconfigPath);
+        const compilerOptions = mergedConfig.compilerOptions || {};
+        const tsconfigDir = path.dirname(tsconfigPath);
+        const baseUrlStr = compilerOptions.baseUrl;
+        
+        tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+        tsArcConfig.paths = compilerOptions.paths || {};
+        tsArcConfig.tsconfigDir = tsconfigDir;
+    }
+    
+    await registerLoader();
+    
+    import(scriptUrl).catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });
+}

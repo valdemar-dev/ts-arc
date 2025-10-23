@@ -1,3 +1,9 @@
+#!/usr/bin/env node
+
+// src/cli.ts
+import * as path2 from "node:path";
+import * as url2 from "node:url";
+
 // src/bin.ts
 import * as fs from "node:fs";
 import { register } from "node:module";
@@ -85,9 +91,9 @@ async function registerLoader() {
   const loaderUrl = url.pathToFileURL(loaderPath).href;
   register(loaderUrl, { data: tsArcConfig });
 }
-async function loadModule(scriptUrl) {
-  const scriptPath = url.fileURLToPath(scriptUrl);
-  const tsconfigPath = findTsConfig(path.dirname(scriptPath));
+async function loadModule(scriptUrl2) {
+  const scriptPath2 = url.fileURLToPath(scriptUrl2);
+  const tsconfigPath = findTsConfig(path.dirname(scriptPath2));
   if (tsconfigPath) {
     const mergedConfig = loadConfig(tsconfigPath);
     const compilerOptions = mergedConfig.compilerOptions || {};
@@ -98,12 +104,21 @@ async function loadModule(scriptUrl) {
     tsArcConfig.tsconfigDir = tsconfigDir;
   }
   await registerLoader();
-  import(scriptUrl).catch((err) => {
+  import(scriptUrl2).catch((err) => {
     console.error(err);
     process.exit(1);
   });
 }
-export {
-  loadModule,
-  registerLoader
-};
+
+// src/cli.ts
+var script = process.argv[2];
+if (!script) {
+  console.error("Usage: ts-arc <script.ts> [args...]");
+  process.exit(1);
+}
+var scriptPath = path2.resolve(script);
+var scriptUrl = url2.pathToFileURL(scriptPath).href;
+process.argv = [process.argv[0], script, ...process.argv.slice(3)];
+(async () => {
+  await loadModule(scriptUrl);
+})();
