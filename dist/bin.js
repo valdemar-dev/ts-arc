@@ -83,12 +83,10 @@ function findTsConfig(dir) {
 }
 var tsArcConfig = { baseUrl: null, paths: {}, tsconfigDir: null };
 async function registerLoader() {
-  console.log("Registering ts-arc module loader..");
   register("./loader.js", import.meta.url, { data: tsArcConfig });
 }
-async function loadModule(scriptUrl) {
-  const scriptPath = url.fileURLToPath(scriptUrl);
-  const tsconfigPath = findTsConfig(path.dirname(scriptPath));
+async function setArcTsConfig(directory) {
+  const tsconfigPath = findTsConfig(directory);
   if (tsconfigPath) {
     const mergedConfig = loadConfig(tsconfigPath);
     const compilerOptions = mergedConfig.compilerOptions || {};
@@ -98,6 +96,10 @@ async function loadModule(scriptUrl) {
     tsArcConfig.paths = compilerOptions.paths || {};
     tsArcConfig.tsconfigDir = tsconfigDir;
   }
+}
+async function loadModule(scriptUrl) {
+  const scriptPath = url.fileURLToPath(scriptUrl);
+  setArcTsConfig(path.dirname(scriptPath));
   await registerLoader();
   import(scriptUrl).catch((err) => {
     console.error(err);
@@ -106,5 +108,6 @@ async function loadModule(scriptUrl) {
 }
 export {
   loadModule,
-  registerLoader
+  registerLoader,
+  setArcTsConfig
 };
