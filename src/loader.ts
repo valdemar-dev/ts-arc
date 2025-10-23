@@ -7,7 +7,6 @@ import { transformSync } from 'esbuild';
 let config: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null };
 
 export function initialize(initContext: any) {
-    console.log("TS-ARC: Loader got init context:", initContext);
     config = initContext;
 }
 
@@ -41,14 +40,17 @@ export async function resolve(
                         const newSpecifier = target.replace(/\*/g, capture);
                         const effectiveBase = baseUrl ?? tsconfigDir;
                         
+                        const filePath = `./${newSpecifier}`;
+                        
                         if (effectiveBase) {
                             const fakeParent = url.pathToFileURL(path.join(effectiveBase, 'dummy.ts')).href;
-                            
                             try {
-                                const resolved = await resolve(`./${newSpecifier}`, { parentURL: fakeParent }, nextResolve);
+                                const resolved = await resolve(filePath, { parentURL: fakeParent }, nextResolve);
                                 
                                 return { ...resolved, shortCircuit: true };
                             } catch (error: any) {
+                                console.error("TS-ARC: Could not find a module with a resolved filePath of:", filePath);
+                                
                                 if (error.code !== 'ERR_MODULE_NOT_FOUND') {
                                     throw error;
                                 }
@@ -61,12 +63,16 @@ export async function resolve(
             if (baseUrl) {
                 const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
                 
+                const filePath = `./${specifier}`;
+                
                 try {
-                    const resolved = await resolve(`./${specifier}`, { parentURL: fakeParent }, nextResolve);
+                    const resolved = await resolve(filePath, { parentURL: fakeParent }, nextResolve);
                     
                     return { ...resolved, shortCircuit: true };
                 } catch (error: any) {
                     if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                        console.error("TS-ARC: Could not find a module with a resolved filePath of:", filePath);
+                                
                         throw error;
                     }
                 }
