@@ -8,7 +8,8 @@ const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const loaderPath = path.join(__dirname, "loader.js");
-
+const loaderUrl = url.pathToFileURL(loaderPath).href;
+    
 const require = createRequire(import.meta.url);
 
 /** We want to remove naughty little JSON comments that people sometimes put in their tsconfig. They shouldn't, I think; but they do. */
@@ -110,8 +111,8 @@ function findTsConfig(dir: string): string | null {
 let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = { baseUrl: null, paths: {}, tsconfigDir: null };
 
 export async function registerLoader() {
-    const loaderUrl = url.pathToFileURL(loaderPath).href;
-    register(loaderUrl, { data: tsArcConfig });
+    console.log("Registering ts-arc module loader..");
+    register("./loader.js", import.meta.url, { data: tsArcConfig });
 }
 
 export async function loadModule(scriptUrl: string) {

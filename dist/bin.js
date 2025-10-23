@@ -7,6 +7,7 @@ import * as url from "node:url";
 var __filename = url.fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
 var loaderPath = path.join(__dirname, "loader.js");
+var loaderUrl = url.pathToFileURL(loaderPath).href;
 var require2 = createRequire(import.meta.url);
 function stripJsonComments(input) {
   let output = "";
@@ -82,8 +83,8 @@ function findTsConfig(dir) {
 }
 var tsArcConfig = { baseUrl: null, paths: {}, tsconfigDir: null };
 async function registerLoader() {
-  const loaderUrl = url.pathToFileURL(loaderPath).href;
-  register(loaderUrl, { data: tsArcConfig });
+  console.log("Registering ts-arc module loader..");
+  register("./loader.js", import.meta.url, { data: tsArcConfig });
 }
 async function loadModule(scriptUrl) {
   const scriptPath = url.fileURLToPath(scriptUrl);
