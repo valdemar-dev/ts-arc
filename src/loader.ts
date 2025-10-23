@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
@@ -15,23 +14,21 @@ export async function resolve(
     context: { parentURL?: string },
     nextResolve: (specifier: string, context: { parentURL?: string }) => Promise<{ url: string; format?: string; shortCircuit?: boolean }>
 ): Promise<{ url: string; format?: string; shortCircuit?: boolean }> {
-    const isRelative = specifier.startsWith('.') || specifier.startsWith('/');
+    const isRelativeOrAbsolute = specifier.startsWith('.') || specifier.startsWith('/');
 
-    if (!isRelative) {
-        console.debug("Resolving,", specifier, "with tsconfig:", config);
-        
+    if (!isRelativeOrAbsolute) {
         if (config) {
             const { baseUrl, paths, tsconfigDir } = config;
+            const effectiveBaseDir = baseUrl ? path.resolve(tsconfigDir ?? '', baseUrl) : tsconfigDir;
 
             for (const key of Object.keys(paths)) {
                 let capture: string | null = null;
-                
-                if (key.endsWith('/*')) {
-                    const prefix = key.slice(0, -2);
-                    
-                    if (specifier.startsWith(prefix)) {
-                        let afterPrefix = specifier.slice(prefix.length);
-                        capture = afterPrefix.startsWith('/') ? afterPrefix.slice(1) : afterPrefix;
+                let isWildcard = key.endsWith('/*');
+                const prefix = isWildcard ? key.slice(0, -2) : key;
+
+                if (isWildcard) {
+                    if (specifier.startsWith(prefix + '/')) {
+                        capture = specifier.slice(prefix.length + 1);
                     }
                 } else if (specifier === key) {
                     capture = '';
@@ -39,23 +36,18 @@ export async function resolve(
 
                 if (capture !== null) {
                     for (const target of paths[key]) {
-                        const newSpecifier = target.replace(/\*/g, capture);
-                        const effectiveBase = baseUrl ?? tsconfigDir;
-                        
-                        const filePath = `./${newSpecifier}`;
-                        
-                        if (effectiveBase) {
-                            const fakeParent = url.pathToFileURL(path.join(effectiveBase, 'dummy.ts')).href;
-                            try {
-                                const resolved = await resolve(filePath, { parentURL: fakeParent }, nextResolve);
-                                
-                                return { ...resolved, shortCircuit: true };
-                            } catch (error: any) {
-                                console.error("TS-ARC: Could not find a module with a resolved filePath of:", filePath);
-                                
-                                if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-                                    throw error;
-                                }
+                        const mapped = isWildcard ? target.replace(/\*/g, capture) : target;
+                        const mappedSpecifier = `./${mapped}`;
+                        const fakeParentDir = effectiveBaseDir ?? process.cwd();
+                        const fakeParentURL = url.pathToFileURL(path.join(fakeParentDir, 'dummy.ts')).href;
+
+                        try {
+                            const resolved = await resolve(mappedSpecifier, { parentURL: fakeParentURL }, nextResolve);
+                            return { ...resolved, shortCircuit: true };
+                        } catch (error: any) {
+                            console.error(`TS-ARC: Failed to resolve mapped specifier "${mappedSpecifier}" from base "${fakeParentDir}":`, error.message);
+                            if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                                throw error;
                             }
                         }
                     }
@@ -63,30 +55,35 @@ export async function resolve(
             }
 
             if (baseUrl) {
-                const fakeParent = url.pathToFileURL(path.join(baseUrl, 'dummy.ts')).href;
-                
-                const filePath = `./${specifier}`;
-                
+                const baseDir = path.resolve(tsconfigDir ?? '', baseUrl);
+                const mappedSpecifier = `./${specifier}`;
+                const fakeParentURL = url.pathToFileURL(path.join(baseDir, 'dummy.ts')).href;
+
                 try {
-                    const resolved = await resolve(filePath, { parentURL: fakeParent }, nextResolve);
-                    
+                    const resolved = await resolve(mappedSpecifier, { parentURL: fakeParentURL }, nextResolve);
                     return { ...resolved, shortCircuit: true };
                 } catch (error: any) {
+                    console.error(`TS-ARC: Failed to resolve specifier "${specifier}" from baseUrl "${baseDir}":`, error.message);
                     if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-                        console.error("TS-ARC: Could not find a module with a resolved filePath of:", filePath);
-                                
                         throw error;
                     }
                 }
             }
         }
+
+        try {
+            const resolved = await nextResolve(specifier, context);
+            return { ...resolved, shortCircuit: true };
+        } catch (error: any) {
+            if (error.code === 'ERR_MODULE_NOT_FOUND') {
+                throw error;
+            }
+            throw error;
+        }
     }
-    
-    console.log("Module path", specifier, "is relative.");
 
     try {
         const resolved = await nextResolve(specifier, context);
-        
         return { ...resolved, shortCircuit: true };
     } catch (error: any) {
         if (error.code !== 'ERR_MODULE_NOT_FOUND') {
@@ -94,43 +91,34 @@ export async function resolve(
         }
     }
 
-    try {
-        const resolved = await nextResolve(specifier + '.ts', context);
-        
-        return { ...resolved, shortCircuit: true };
-    } catch (error: any) {
-        if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-            throw error;
+    const ext = path.extname(specifier);
+    if (ext !== '') {
+        throw new Error(`Module not found: ${specifier}`);
+    }
+
+    for (const suffix of ['.ts', '.tsx']) {
+        try {
+            const resolved = await nextResolve(specifier + suffix, context);
+            return { ...resolved, shortCircuit: true };
+        } catch (error: any) {
+            if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                throw error;
+            }
         }
     }
 
-    try {
-        const resolved = await nextResolve(specifier + '.tsx', context);
-        
-        return { ...resolved, shortCircuit: true };
-    } catch (error: any) {
-        if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-            throw error;
+    for (const suffix of ['/index.ts', '/index.tsx']) {
+        try {
+            const resolved = await nextResolve(specifier + suffix, context);
+            return { ...resolved, shortCircuit: true };
+        } catch (error: any) {
+            if (error.code !== 'ERR_MODULE_NOT_FOUND') {
+                throw error;
+            }
         }
     }
 
-    try {
-        const resolved = await nextResolve(specifier + '/index.ts', context);
-        
-        return { ...resolved, shortCircuit: true };
-    } catch (error: any) {
-        if (error.code !== 'ERR_MODULE_NOT_FOUND') {
-            throw error;
-        }
-    }
-
-    try {
-        const resolved = await nextResolve(specifier + '/index.tsx', context);
-        
-        return { ...resolved, shortCircuit: true };
-    } catch (error: any) {
-        throw error;
-    }
+    throw new Error(`Module not found: ${specifier}`);
 }
 
 export async function load(
