@@ -81,6 +81,8 @@ export async function resolve(
             }
         }
     }
+    
+    console.log("Module path", specifier, "is relative.");
 
     try {
         const resolved = await nextResolve(specifier, context);
