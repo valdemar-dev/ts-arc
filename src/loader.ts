@@ -29,7 +29,9 @@ async function resolveLocal(baseDir: string, relativePath: string): Promise<{ ur
         fullPath + '.ts',
         fullPath + '.tsx',
         path.join(fullPath, 'index.ts'),
-        path.join(fullPath, 'index.tsx')
+        path.join(fullPath, 'index.tsx'),
+        path.join(fullPath, 'page.ts'),
+        path.join(fullPath, 'page.tsx')
     ];
 
     for (const candidate of candidates) {
