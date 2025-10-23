@@ -28,13 +28,8 @@ export async function resolve(
                     const prefix = key.slice(0, -2);
                     
                     if (specifier.startsWith(prefix)) {
-                        const afterPrefix = specifier.slice(prefix.length);
-                        if (afterPrefix === '' || afterPrefix.startsWith('/')) {
-                            capture = afterPrefix;
-                            if (capture.startsWith('/')) {
-                                capture = capture.slice(1);
-                            }
-                        }
+                        let afterPrefix = specifier.slice(prefix.length);
+                        capture = afterPrefix.startsWith('/') ? afterPrefix.slice(1) : afterPrefix;
                     }
                 } else if (specifier === key) {
                     capture = '';
