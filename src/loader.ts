@@ -70,8 +70,12 @@ export async function resolve(
         const resolved = await resolveLocal(parentPath, specifier);
         return { ...resolved, shortCircuit: true };
     } else {
+        console.log("Attempting to resolve non path-like specifier", specifier);
+        
         const { paths } = config;
         const effectiveBase = getEffectiveBase();
+        
+        console.log("That specifiers effectiveBase is:", specifier);
 
         for (const key of Object.keys(paths)) {
             let capture: string | null = null;
