@@ -56,14 +56,11 @@ async function resolve2(specifier, context, nextResolve) {
   }
   const isPathLike = specifier.startsWith(".") || specifier.startsWith("/");
   if (isPathLike) {
-    console.log("Attempting to resolve a path-like specifier:", specifier);
     const resolved = await resolveLocal(parentPath, specifier);
     return { ...resolved, shortCircuit: true };
   } else {
-    console.log("Attempting to resolve non path-like specifier:", specifier);
     const { paths } = config;
     const effectiveBase = getEffectiveBase();
-    console.log("That specifiers effectiveBase is:", specifier);
     for (const key of Object.keys(paths)) {
       let capture = null;
       const isWildcard = key.endsWith("/*");
