@@ -18,10 +18,10 @@ export async function resolve(
     const isRelative = specifier.startsWith('.') || specifier.startsWith('/');
 
     if (!isRelative) {
+        console.debug("Resolving,", specifier, "with tsconfig:", config);
+        
         if (config) {
             const { baseUrl, paths, tsconfigDir } = config;
-            
-            console.debug("Resolving,", specifier, "with tsconfig:", config);
 
             for (const key of Object.keys(paths)) {
                 let capture: string | null = null;
