@@ -2,7 +2,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
-import { transformSync } from 'esbuild';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { transformSync } = require('esbuild');
 
 let config: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = {
     baseUrl: null,

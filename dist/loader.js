@@ -4,7 +4,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as url from "url";
-import { transformSync } from "esbuild";
+import { createRequire } from "module";
+var require2 = createRequire(import.meta.url);
+var { transformSync } = require2("esbuild");
 var config = {
   baseUrl: null,
   paths: {},
