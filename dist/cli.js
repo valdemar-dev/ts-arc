@@ -40,8 +40,13 @@ function stripJsonComments(input) {
     }
     if (char === "/" && input[i + 1] === "*") {
       i += 2;
-      while (!(input[i - 1] === "*" && input[i])) i++;
-      if (i < input.length) i++;
+      while (i < input.length) {
+        if (input[i - 1] === "*" && input[i] === "/") {
+          i++;
+          break;
+        }
+        i++;
+      }
       continue;
     }
     output += char;
