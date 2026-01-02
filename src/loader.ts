@@ -147,3 +147,11 @@ const require = createRequire(import.meta.url);`,
         shortCircuit: true,
     };
 }
+
+export function resolveSync(
+    specifier: string,
+    context: { parentURL?: string },
+    nextResolve: (specifier: string, context: { parentURL?: string }) => { url: string; format?: string; shortCircuit?: boolean }
+): { url: string; format?: string; shortCircuit?: boolean } {
+    return nextResolve(specifier, context);
+}

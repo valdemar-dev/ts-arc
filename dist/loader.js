@@ -123,8 +123,12 @@ const require = createRequire(import.meta.url);`
     shortCircuit: true
   };
 }
+function resolveSync(specifier, context, nextResolve) {
+  return nextResolve(specifier, context);
+}
 export {
   initialize,
   load,
-  resolve2 as resolve
+  resolve2 as resolve,
+  resolveSync
 };
