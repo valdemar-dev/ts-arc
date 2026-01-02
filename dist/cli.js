@@ -40,7 +40,7 @@ function stripJsonComments(input) {
     }
     if (char === "/" && input[i + 1] === "*") {
       i += 2;
-      while (i < input.length && !(input[i - 1] === "*" && input[i] === "/")) i++;
+      while (!(input[i - 1] === "*" && input[i])) i++;
       if (i < input.length) i++;
       continue;
     }
@@ -53,17 +53,13 @@ function loadConfig(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
   const stripped = stripJsonComments(content);
   const config = JSON.parse(stripped);
-  if (!config.extends) {
-    return config;
-  }
+  if (!config.extends) return config;
   const extendsVal = config.extends;
   const tsconfigDir = path.dirname(filePath);
   let extendsPath;
   if (extendsVal.startsWith("./") || extendsVal.startsWith("../")) {
     extendsPath = path.resolve(tsconfigDir, extendsVal);
-    if (!extendsPath.endsWith(".json")) {
-      extendsPath += ".json";
-    }
+    if (!extendsPath.endsWith(".json")) extendsPath += ".json";
   } else {
     try {
       extendsPath = require2.resolve(extendsVal);
@@ -79,24 +75,36 @@ function loadConfig(filePath) {
 function findTsConfig(dir) {
   let current = dir;
   while (current !== path.parse(current).root) {
-    const tsconfigPath = path.join(current, "tsconfig.json");
-    if (fs.existsSync(tsconfigPath)) {
-      return tsconfigPath;
-    }
+    const tsconfigPath2 = path.join(current, "tsconfig.json");
+    if (fs.existsSync(tsconfigPath2)) return tsconfigPath2;
     current = path.dirname(current);
   }
   return null;
 }
-var tsArcConfig = { baseUrl: null, paths: {}, tsconfigDir: null };
-async function registerLoader() {
-  register("./loader.js", import.meta.url, { data: tsArcConfig });
+var tsArcConfig = {
+  baseUrl: null,
+  paths: {},
+  tsconfigDir: null
+};
+var tsconfigPath = findTsConfig(process.cwd());
+if (tsconfigPath) {
+  const mergedConfig = loadConfig(tsconfigPath);
+  const compilerOptions = mergedConfig.compilerOptions || {};
+  const tsconfigDir = path.dirname(tsconfigPath);
+  const baseUrlStr = compilerOptions.baseUrl;
+  tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+  tsArcConfig.paths = compilerOptions.paths || {};
+  tsArcConfig.tsconfigDir = tsconfigDir;
+}
+function registerLoader() {
+  register(loaderPath, import.meta.url, { data: tsArcConfig });
 }
 async function setArcTsConfig(directory) {
-  const tsconfigPath = findTsConfig(directory);
-  if (tsconfigPath) {
-    const mergedConfig = loadConfig(tsconfigPath);
+  const tsconfigPath2 = findTsConfig(directory);
+  if (tsconfigPath2) {
+    const mergedConfig = loadConfig(tsconfigPath2);
     const compilerOptions = mergedConfig.compilerOptions || {};
-    const tsconfigDir = path.dirname(tsconfigPath);
+    const tsconfigDir = path.dirname(tsconfigPath2);
     const baseUrlStr = compilerOptions.baseUrl;
     tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
     tsArcConfig.paths = compilerOptions.paths || {};
@@ -106,7 +114,7 @@ async function setArcTsConfig(directory) {
 async function loadModule(scriptUrl2) {
   const scriptPath2 = url.fileURLToPath(scriptUrl2);
   setArcTsConfig(path.dirname(scriptPath2));
-  await registerLoader();
+  registerLoader();
   import(scriptUrl2).catch((err) => {
     console.error(err);
     process.exit(1);

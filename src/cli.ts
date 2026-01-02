@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import * as url from 'node:url';
-import { loadModule, registerLoader } from "./bin";
+import { loadModule } from "./bin";
 
 const script = process.argv[2];
 if (!script) {

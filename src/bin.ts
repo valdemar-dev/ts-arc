@@ -9,10 +9,9 @@ const __dirname = path.dirname(__filename);
 
 const loaderPath = path.join(__dirname, "loader.js");
 const loaderUrl = url.pathToFileURL(loaderPath).href;
-    
-const require = createRequire(import.meta.url);
 
-/** We want to remove naughty little JSON comments that people sometimes put in their tsconfig. They shouldn't, I think; but they do. */
+const require2 = createRequire(import.meta.url);
+
 function stripJsonComments(input: string): string {
     let output = '';
     let insideString = false;
@@ -23,13 +22,13 @@ function stripJsonComments(input: string): string {
 
         if (insideString) {
             output += char;
-            if (char === '"' && input[i - 1] !== '\\') insideString = false; // end of string unless escaped
+            if (char === '"' && input[i - 1] !== '\\') insideString = false;
             i++;
             continue;
         }
 
         if (char === '"') {
-            insideString = true; // entering string literal
+            insideString = true;
             output += char;
             i++;
             continue;
@@ -37,17 +36,14 @@ function stripJsonComments(input: string): string {
 
         if (char === '/' && input[i + 1] === '/') {
             i += 2;
-            while (i < input.length && input[i] !== '\n') i++; // skip single-line comment
+            while (i < input.length && input[i] !== '\n') i++;
             continue;
         }
 
         if (char === '/' && input[i + 1] === '*') {
             i += 2;
-            while (
-                i < input.length &&
-                !(input[i - 1] === '*' && input[i] === '/')
-            ) i++; // skip multi-line comment until closing */
-            if (i < input.length) i++; // move past closing '/'
+            while (!(input[i - 1] === '*' && input[i])) i++;
+            if (i < input.length) i++;
             continue;
         }
 
@@ -63,69 +59,66 @@ function loadConfig(filePath: string): any {
     const stripped = stripJsonComments(content);
     const config = JSON.parse(stripped);
 
-    if (!config.extends) {
-        return config;
-    }
+    if (!config.extends) return config;
 
     const extendsVal = config.extends;
     const tsconfigDir = path.dirname(filePath);
-    
     let extendsPath: string;
 
     if (extendsVal.startsWith('./') || extendsVal.startsWith('../')) {
         extendsPath = path.resolve(tsconfigDir, extendsVal);
-        if (!extendsPath.endsWith('.json')) {
-            extendsPath += '.json';
-        }
+        if (!extendsPath.endsWith('.json')) extendsPath += '.json';
     } else {
-        try {
-            extendsPath = require.resolve(extendsVal);
-        } catch {
-            extendsPath = require.resolve(extendsVal + '/tsconfig.json');
-        }
+        try { extendsPath = require2.resolve(extendsVal); }
+        catch { extendsPath = require2.resolve(extendsVal + '/tsconfig.json'); }
     }
 
     const baseConfig = loadConfig(extendsPath);
     const merged = { ...baseConfig, ...config };
-    
     merged.compilerOptions = { ...(baseConfig.compilerOptions || {}), ...(config.compilerOptions || {}) };
-    
     return merged;
 }
 
 function findTsConfig(dir: string): string | null {
     let current = dir;
-    
     while (current !== path.parse(current).root) {
         const tsconfigPath = path.join(current, 'tsconfig.json');
-        if (fs.existsSync(tsconfigPath)) {
-            return tsconfigPath;
-        }
+        if (fs.existsSync(tsconfigPath)) return tsconfigPath;
         current = path.dirname(current);
     }
-    
     return null;
 }
 
+let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = {
+    baseUrl: null,
+    paths: {},
+    tsconfigDir: null
+};
 
-let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = { baseUrl: null, paths: {}, tsconfigDir: null };
+const tsconfigPath = findTsConfig(process.cwd());
 
-export async function registerLoader() {
-    register("./loader.js", import.meta.url, { data: tsArcConfig });
+if (tsconfigPath) {
+    const mergedConfig = loadConfig(tsconfigPath);
+    const compilerOptions = mergedConfig.compilerOptions || {};
+    const tsconfigDir = path.dirname(tsconfigPath);
+    const baseUrlStr = compilerOptions.baseUrl;
+
+    tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+    tsArcConfig.paths = compilerOptions.paths || {};
+    tsArcConfig.tsconfigDir = tsconfigDir;
 }
 
-/**
-    Set the active tsconfig that arc will use.
-*/
+export function registerLoader() {
+    register(loaderPath, import.meta.url, { data: tsArcConfig });
+}
+
 export async function setArcTsConfig(directory: string) {
     const tsconfigPath = findTsConfig(directory);
-    
     if (tsconfigPath) {
         const mergedConfig = loadConfig(tsconfigPath);
         const compilerOptions = mergedConfig.compilerOptions || {};
         const tsconfigDir = path.dirname(tsconfigPath);
         const baseUrlStr = compilerOptions.baseUrl;
-        
         tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
         tsArcConfig.paths = compilerOptions.paths || {};
         tsArcConfig.tsconfigDir = tsconfigDir;
@@ -134,13 +127,7 @@ export async function setArcTsConfig(directory: string) {
 
 export async function loadModule(scriptUrl: string) {
     const scriptPath = url.fileURLToPath(scriptUrl);
-
-    setArcTsConfig(path.dirname(scriptPath))
-    
-    await registerLoader();
-    
-    import(scriptUrl).catch((err) => {
-        console.error(err);
-        process.exit(1);
-    });
+    setArcTsConfig(path.dirname(scriptPath));
+    registerLoader();
+    import(scriptUrl).catch(err => { console.error(err); process.exit(1); });
 }
