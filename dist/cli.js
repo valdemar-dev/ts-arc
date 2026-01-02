@@ -89,7 +89,9 @@ function findTsConfig(dir) {
 var tsArcConfig = {
   baseUrl: null,
   paths: {},
-  tsconfigDir: null
+  tsconfigDir: null,
+  emitDecoratorMetadata: false,
+  experimentalDecorators: false
 };
 var tsconfigPath = findTsConfig(process.cwd());
 if (tsconfigPath) {
@@ -100,6 +102,8 @@ if (tsconfigPath) {
   tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
   tsArcConfig.paths = compilerOptions.paths || {};
   tsArcConfig.tsconfigDir = tsconfigDir;
+  tsArcConfig.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+  tsArcConfig.experimentalDecorators = compilerOptions.experimentalDecorators || false;
 }
 function registerLoader() {
   register(loaderPath, import.meta.url, { data: tsArcConfig });
@@ -114,6 +118,8 @@ async function setArcTsConfig(directory) {
     tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
     tsArcConfig.paths = compilerOptions.paths || {};
     tsArcConfig.tsconfigDir = tsconfigDir;
+    tsArcConfig.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+    tsArcConfig.experimentalDecorators = compilerOptions.experimentalDecorators || false;
   }
 }
 async function loadModule(scriptUrl2) {

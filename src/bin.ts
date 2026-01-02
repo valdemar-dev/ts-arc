@@ -94,10 +94,12 @@ function findTsConfig(dir: string): string | null {
     return null;
 }
 
-let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null } = {
+let tsArcConfig: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigDir: string | null; emitDecoratorMetadata: boolean; experimentalDecorators: boolean } = {
     baseUrl: null,
     paths: {},
-    tsconfigDir: null
+    tsconfigDir: null,
+    emitDecoratorMetadata: false,
+    experimentalDecorators: false
 };
 
 const tsconfigPath = findTsConfig(process.cwd());
@@ -111,6 +113,8 @@ if (tsconfigPath) {
     tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
     tsArcConfig.paths = compilerOptions.paths || {};
     tsArcConfig.tsconfigDir = tsconfigDir;
+    tsArcConfig.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+    tsArcConfig.experimentalDecorators = compilerOptions.experimentalDecorators || false;
 }
 
 export function registerLoader() {
@@ -127,6 +131,8 @@ export async function setArcTsConfig(directory: string) {
         tsArcConfig.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
         tsArcConfig.paths = compilerOptions.paths || {};
         tsArcConfig.tsconfigDir = tsconfigDir;
+        tsArcConfig.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+        tsArcConfig.experimentalDecorators = compilerOptions.experimentalDecorators || false;
     }
 }
 
