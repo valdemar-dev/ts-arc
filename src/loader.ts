@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
 import { createRequire } from 'module';
+import { builtinModules } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { transformSync } = require('esbuild');
@@ -47,7 +48,52 @@ function resolveLocalSync(baseDir: string, relativePath: string): { url: string 
 }
 
 async function resolveLocal(baseDir: string, relativePath: string): Promise<{ url: string }> {
-    return resolveLocalSync(baseDir, relativePath);  // Reuse sync version since no async ops
+    return resolveLocalSync(baseDir, relativePath);
+}
+
+function resolveBareSync(specifier: string, parentPath: string): string {
+    const requireFromParent = createRequire(path.join(parentPath, 'index.js'));
+    try {
+        const resolved = requireFromParent.resolve(specifier);
+        if (resolved === specifier && builtinModules.includes(specifier.replace(/^node:/, ''))) {
+            return `node:${specifier.replace(/^node:/, '')}`;
+        }
+        return url.pathToFileURL(resolved).href;
+    } catch (e: any) {
+        if (e.code === 'MODULE_NOT_FOUND') {
+            throw Object.assign(new Error(`Cannot find module '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
+        }
+        throw e;
+    }
+}
+
+function getFormatSync(urlStr: string): string {
+    const urlObj = new URL(urlStr);
+    if (urlObj.protocol === 'node:') return 'builtin';
+    if (urlObj.protocol !== 'file:') throw new Error(`Unsupported protocol: ${urlObj.protocol}`);
+
+    const filePath = url.fileURLToPath(urlStr);
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === '.wasm') return 'wasm';
+    if (ext === '.json') return 'json';
+    if (ext === '.node') return 'addon';
+    if (ext === '.mjs') return 'module';
+    if (ext === '.cjs') return 'commonjs';
+    if (ext !== '.js') throw new Error(`Unknown file extension: ${ext}`);
+
+    let currentDir = path.dirname(filePath);
+    while (currentDir !== path.parse(currentDir).root) {
+        const pkgPath = path.join(currentDir, 'package.json');
+        if (fs.existsSync(pkgPath)) {
+            const pkgContent = fs.readFileSync(pkgPath, 'utf8');
+            const pkg = JSON.parse(pkgContent);
+            if (pkg.type === 'module') return 'module';
+            return 'commonjs';
+        }
+        currentDir = path.dirname(currentDir);
+    }
+    return 'commonjs';
 }
 
 export async function resolve(
@@ -64,8 +110,7 @@ export async function resolve(
         const filePath = url.fileURLToPath(specifier);
         const dir = path.dirname(filePath);
         const baseName = path.basename(filePath);
-        const relative = path.extname(baseName) ? baseName : baseName;
-        const resolved = await resolveLocal(dir, relative);
+        const resolved = await resolveLocal(dir, baseName);
         return { ...resolved, shortCircuit: true };
     }
 
@@ -117,8 +162,8 @@ export async function resolve(
             }
         }
 
-        const resolved = await nextResolve(specifier, context);
-        return { ...resolved, shortCircuit: true };
+        const resolvedUrl = resolveBareSync(specifier, parentPath);
+        return { url: resolvedUrl, shortCircuit: true };
     }
 }
 
@@ -127,30 +172,7 @@ export async function load(
     context: { format?: string },
     nextLoad: (url: string, context: { format?: string }) => Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }>
 ): Promise<{ format: string; source?: string | Buffer; shortCircuit?: boolean }> {
-    if (!urlStr.endsWith('.ts') && !urlStr.endsWith('.tsx')) {
-        return nextLoad(urlStr, context);
-    }
-
-    const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
-    const filePath = url.fileURLToPath(urlStr);
-    const rawSource = fs.readFileSync(filePath, 'utf8');
-
-    const { code } = transformSync(rawSource, {
-        loader: esbuildLoader,
-        format: 'esm',
-        target: `node${process.versions.node}`,
-        sourcemap: 'inline',
-        sourcefile: filePath,
-        banner: `
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);`,
-    });
-
-    return {
-        format: 'module',
-        source: code,
-        shortCircuit: true,
-    };
+    return loadSync(urlStr, context, () => { throw new Error('Chaining not supported'); });
 }
 
 export function loadSync(
@@ -158,30 +180,36 @@ export function loadSync(
     context: { format?: string },
     nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
-    if (!urlStr.endsWith('.ts') && !urlStr.endsWith('.tsx')) {
-        return nextLoadSync(urlStr, context);
-    }
+    if (urlStr.endsWith('.ts') || urlStr.endsWith('.tsx')) {
+        const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
+        const filePath = url.fileURLToPath(urlStr);
+        const rawSource = fs.readFileSync(filePath, 'utf8');
 
-    const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
-    const filePath = url.fileURLToPath(urlStr);
-    const rawSource = fs.readFileSync(filePath, 'utf8');
-
-    const { code } = transformSync(rawSource, {
-        loader: esbuildLoader,
-        format: 'esm',
-        target: `node${process.versions.node}`,
-        sourcemap: 'inline',
-        sourcefile: filePath,
-        banner: `
+        const { code } = transformSync(rawSource, {
+            loader: esbuildLoader,
+            format: 'esm',
+            target: `node${process.versions.node}`,
+            sourcemap: 'inline',
+            sourcefile: filePath,
+            banner: `
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);`,
-    });
+        });
 
-    return {
-        format: 'module',
-        source: code,
-        shortCircuit: true,
-    };
+        return {
+            format: 'module',
+            source: code,
+            shortCircuit: true,
+        };
+    } else {
+        const format = getFormatSync(urlStr);
+        let source: string | Buffer | undefined;
+        if (format !== 'builtin') {
+            const filePath = url.fileURLToPath(urlStr);
+            source = fs.readFileSync(filePath);
+        }
+        return { format, source, shortCircuit: true };
+    }
 }
 
 export function resolveSync(specifier: any, context: { parentURL: string }) {
@@ -249,8 +277,6 @@ export function resolveSync(specifier: any, context: { parentURL: string }) {
         }
     }
 
-    throw Object.assign(
-        new Error(`Cannot find module '${specifier}'`),
-        { code: "ERR_MODULE_NOT_FOUND" }
-    );
+    const resolvedUrl = resolveBareSync(specifier, parentPath);
+    return { url: resolvedUrl, shortCircuit: true };
 }
