@@ -22,7 +22,7 @@ function getEffectiveBase() {
   }
   return null;
 }
-async function resolveLocal(baseDir, relativePath) {
+function resolveLocalSync(baseDir, relativePath) {
   const fullPath = path.resolve(baseDir, relativePath);
   const candidates = [
     fullPath,
@@ -34,14 +34,14 @@ async function resolveLocal(baseDir, relativePath) {
     path.join(fullPath, "page.tsx")
   ];
   for (const candidate of candidates) {
-    try {
-      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-        return { url: url.pathToFileURL(candidate).href };
-      }
-    } catch {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return { url: url.pathToFileURL(candidate).href };
     }
   }
   throw Object.assign(new Error(`Cannot find module '${relativePath}'`), { code: "ERR_MODULE_NOT_FOUND" });
+}
+async function resolveLocal(baseDir, relativePath) {
+  return resolveLocalSync(baseDir, relativePath);
 }
 async function resolve2(specifier, context, nextResolve) {
   let parentPath = process.cwd();
@@ -125,26 +125,28 @@ const require = createRequire(import.meta.url);`
     shortCircuit: true
   };
 }
-function resolveLocalSync(baseDir, relativePath) {
-  const fullPath = path.resolve(baseDir, relativePath);
-  const candidates = [
-    fullPath,
-    fullPath + ".ts",
-    fullPath + ".tsx",
-    path.join(fullPath, "index.ts"),
-    path.join(fullPath, "index.tsx"),
-    path.join(fullPath, "page.ts"),
-    path.join(fullPath, "page.tsx")
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      return { url: url.pathToFileURL(candidate).href };
-    }
+function loadSync(urlStr, context, nextLoadSync) {
+  if (!urlStr.endsWith(".ts") && !urlStr.endsWith(".tsx")) {
+    return nextLoadSync(urlStr, context);
   }
-  throw Object.assign(
-    new Error(`Cannot find module '${relativePath}'`),
-    { code: "ERR_MODULE_NOT_FOUND" }
-  );
+  const esbuildLoader = urlStr.endsWith(".tsx") ? "tsx" : "ts";
+  const filePath = url.fileURLToPath(urlStr);
+  const rawSource = fs.readFileSync(filePath, "utf8");
+  const { code } = transformSync(rawSource, {
+    loader: esbuildLoader,
+    format: "esm",
+    target: `node${process.versions.node}`,
+    sourcemap: "inline",
+    sourcefile: filePath,
+    banner: `
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);`
+  });
+  return {
+    format: "module",
+    source: code,
+    shortCircuit: true
+  };
 }
 function resolveSync(specifier, context) {
   let parentPath = process.cwd();
@@ -208,7 +210,7 @@ function resolveSync(specifier, context) {
 export {
   initialize,
   load,
+  loadSync,
   resolve2 as resolve,
-  resolveLocalSync,
   resolveSync
 };

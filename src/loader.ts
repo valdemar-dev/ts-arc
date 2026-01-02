@@ -25,7 +25,7 @@ function getEffectiveBase(): string | null {
     return null;
 }
 
-async function resolveLocal(baseDir: string, relativePath: string): Promise<{ url: string }> {
+function resolveLocalSync(baseDir: string, relativePath: string): { url: string } {
     const fullPath = path.resolve(baseDir, relativePath);
     const candidates = [
         fullPath,
@@ -38,14 +38,16 @@ async function resolveLocal(baseDir: string, relativePath: string): Promise<{ ur
     ];
 
     for (const candidate of candidates) {
-        try {
-            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-                return { url: url.pathToFileURL(candidate).href };
-            }
-        } catch {}
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            return { url: url.pathToFileURL(candidate).href };
+        }
     }
 
     throw Object.assign(new Error(`Cannot find module '${relativePath}'`), { code: 'ERR_MODULE_NOT_FOUND' });
+}
+
+async function resolveLocal(baseDir: string, relativePath: string): Promise<{ url: string }> {
+    return resolveLocalSync(baseDir, relativePath);  // Reuse sync version since no async ops
 }
 
 export async function resolve(
@@ -151,28 +153,35 @@ const require = createRequire(import.meta.url);`,
     };
 }
 
-export function resolveLocalSync(baseDir: string, relativePath: string) {
-    const fullPath = path.resolve(baseDir, relativePath);
-    const candidates = [
-        fullPath,
-        fullPath + ".ts",
-        fullPath + ".tsx",
-        path.join(fullPath, "index.ts"),
-        path.join(fullPath, "index.tsx"),
-        path.join(fullPath, "page.ts"),
-        path.join(fullPath, "page.tsx"),
-    ];
-
-    for (const candidate of candidates) {
-        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-            return { url: url.pathToFileURL(candidate).href };
-        }
+export function loadSync(
+    urlStr: string,
+    context: { format?: string },
+    nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
+): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
+    if (!urlStr.endsWith('.ts') && !urlStr.endsWith('.tsx')) {
+        return nextLoadSync(urlStr, context);
     }
 
-    throw Object.assign(
-        new Error(`Cannot find module '${relativePath}'`),
-        { code: "ERR_MODULE_NOT_FOUND" }
-    );
+    const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
+    const filePath = url.fileURLToPath(urlStr);
+    const rawSource = fs.readFileSync(filePath, 'utf8');
+
+    const { code } = transformSync(rawSource, {
+        loader: esbuildLoader,
+        format: 'esm',
+        target: `node${process.versions.node}`,
+        sourcemap: 'inline',
+        sourcefile: filePath,
+        banner: `
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);`,
+    });
+
+    return {
+        format: 'module',
+        source: code,
+        shortCircuit: true,
+    };
 }
 
 export function resolveSync(specifier: any, context: { parentURL: string }) {
