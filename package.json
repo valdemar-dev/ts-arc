@@ -8,7 +8,7 @@
         "ts-arc": "./dist/cli.js"
     },
     "scripts": {
-        "build": "npx esbuild ./src/cli.ts ./src/loader.ts ./src/bin.ts ./src/require.ts --outdir=./dist --platform=node --format=esm --bundle --external:fs --external:path --external:esbuild"
+        "build": "npx esbuild ./src/cli.ts ./src/loader.ts ./src/bin.ts ./src/register.ts --outdir=./dist --platform=node --format=esm --bundle --external:fs --external:path --external:esbuild"
     },
     "keywords": [],
     "author": "",
@@ -22,5 +22,8 @@
     "devDependencies": {
         "@types/node": "^24.9.1",
         "reflect-metadata": "^0.2.2"
+    },
+    "exports": {
+        "./register": "./dist/register.js"
     }
 }

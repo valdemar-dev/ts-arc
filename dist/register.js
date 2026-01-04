@@ -1,4 +1,4 @@
-// src/require.ts
+// src/register.ts
 import path from "node:path";
 import url from "node:url";
 import { register } from "node:module";
