@@ -16,8 +16,101 @@ let config: { baseUrl: string | null; paths: Record<string, string[]>; tsconfigD
     experimentalDecorators: false
 };
 
-export function initialize(initContext: any) {
-    config = initContext;
+function stripJsonComments(input: string): string {
+    let output = '';
+    let insideString = false;
+    let i = 0;
+
+    while (i < input.length) {
+        const char = input[i];
+
+        if (insideString) {
+            output += char;
+            if (char === '"' && input[i - 1] !== '\\') insideString = false;
+            i++;
+            continue;
+        }
+
+        if (char === '"') {
+            insideString = true;
+            output += char;
+            i++;
+            continue;
+        }
+
+        if (char === '/' && input[i + 1] === '/') {
+            i += 2;
+            while (i < input.length && input[i] !== '\n') i++;
+            continue;
+        }
+
+        if (char === '/' && input[i + 1] === '*') {
+            i += 2;
+            while (i < input.length) {
+                if (input[i - 1] === '*' && input[i] === '/') {
+                    i++;
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        output += char;
+        i++;
+    }
+
+    return output;
+}
+
+function loadConfig(filePath: string): any {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const stripped = stripJsonComments(content);
+    const config = JSON.parse(stripped);
+
+    if (!config.extends) return config;
+
+    const extendsVal = config.extends;
+    const tsconfigDir = path.dirname(filePath);
+    let extendsPath: string;
+
+    if (extendsVal.startsWith('./') || extendsVal.startsWith('../')) {
+        extendsPath = path.resolve(tsconfigDir, extendsVal);
+        if (!extendsPath.endsWith('.json')) extendsPath += '.json';
+    } else {
+        try { extendsPath = require.resolve(extendsVal); }
+        catch { extendsPath = require.resolve(extendsVal + '/tsconfig.json'); }
+    }
+
+    const baseConfig = loadConfig(extendsPath);
+    const merged = { ...baseConfig, ...config };
+    merged.compilerOptions = { ...(baseConfig.compilerOptions || {}), ...(config.compilerOptions || {}) };
+    return merged;
+}
+
+function findTsConfig(dir: string): string | null {
+    let current = dir;
+    while (current !== path.parse(current).root) {
+        const tsconfigPath = path.join(current, 'tsconfig.json');
+        if (fs.existsSync(tsconfigPath)) return tsconfigPath;
+        current = path.dirname(current);
+    }
+    return null;
+}
+
+const tsconfigPath = findTsConfig(process.cwd());
+
+if (tsconfigPath) {
+    const mergedConfig = loadConfig(tsconfigPath);
+    const compilerOptions = mergedConfig.compilerOptions || {};
+    const tsconfigDir = path.dirname(tsconfigPath);
+    const baseUrlStr = compilerOptions.baseUrl;
+
+    config.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+    config.paths = compilerOptions.paths || {};
+    config.tsconfigDir = tsconfigDir;
+    config.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+    config.experimentalDecorators = compilerOptions.experimentalDecorators || false;
 }
 
 function getEffectiveBase(): string | null {

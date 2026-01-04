@@ -8,7 +8,7 @@
         "ts-arc": "./dist/cli.js"
     },
     "scripts": {
-        "build": "npx esbuild ./src/cli.ts ./src/loader.ts ./src/bin.ts --outdir=./dist --platform=node --format=esm --bundle --external:fs --external:path --external:esbuild"
+        "build": "npx esbuild ./src/cli.ts ./src/loader.ts ./src/bin.ts ./src/require.ts --outdir=./dist --platform=node --format=esm --bundle --external:fs --external:path --external:esbuild"
     },
     "keywords": [],
     "author": "",

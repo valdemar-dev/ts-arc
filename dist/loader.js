@@ -15,8 +15,88 @@ var config = {
   emitDecoratorMetadata: false,
   experimentalDecorators: false
 };
-function initialize(initContext) {
-  config = initContext;
+function stripJsonComments(input) {
+  let output = "";
+  let insideString = false;
+  let i = 0;
+  while (i < input.length) {
+    const char = input[i];
+    if (insideString) {
+      output += char;
+      if (char === '"' && input[i - 1] !== "\\") insideString = false;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      insideString = true;
+      output += char;
+      i++;
+      continue;
+    }
+    if (char === "/" && input[i + 1] === "/") {
+      i += 2;
+      while (i < input.length && input[i] !== "\n") i++;
+      continue;
+    }
+    if (char === "/" && input[i + 1] === "*") {
+      i += 2;
+      while (i < input.length) {
+        if (input[i - 1] === "*" && input[i] === "/") {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    output += char;
+    i++;
+  }
+  return output;
+}
+function loadConfig(filePath) {
+  const content = fs.readFileSync(filePath, "utf8");
+  const stripped = stripJsonComments(content);
+  const config2 = JSON.parse(stripped);
+  if (!config2.extends) return config2;
+  const extendsVal = config2.extends;
+  const tsconfigDir = path.dirname(filePath);
+  let extendsPath;
+  if (extendsVal.startsWith("./") || extendsVal.startsWith("../")) {
+    extendsPath = path.resolve(tsconfigDir, extendsVal);
+    if (!extendsPath.endsWith(".json")) extendsPath += ".json";
+  } else {
+    try {
+      extendsPath = require2.resolve(extendsVal);
+    } catch {
+      extendsPath = require2.resolve(extendsVal + "/tsconfig.json");
+    }
+  }
+  const baseConfig = loadConfig(extendsPath);
+  const merged = { ...baseConfig, ...config2 };
+  merged.compilerOptions = { ...baseConfig.compilerOptions || {}, ...config2.compilerOptions || {} };
+  return merged;
+}
+function findTsConfig(dir) {
+  let current = dir;
+  while (current !== path.parse(current).root) {
+    const tsconfigPath2 = path.join(current, "tsconfig.json");
+    if (fs.existsSync(tsconfigPath2)) return tsconfigPath2;
+    current = path.dirname(current);
+  }
+  return null;
+}
+var tsconfigPath = findTsConfig(process.cwd());
+if (tsconfigPath) {
+  const mergedConfig = loadConfig(tsconfigPath);
+  const compilerOptions = mergedConfig.compilerOptions || {};
+  const tsconfigDir = path.dirname(tsconfigPath);
+  const baseUrlStr = compilerOptions.baseUrl;
+  config.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+  config.paths = compilerOptions.paths || {};
+  config.tsconfigDir = tsconfigDir;
+  config.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
+  config.experimentalDecorators = compilerOptions.experimentalDecorators || false;
 }
 function getEffectiveBase() {
   const { baseUrl, tsconfigDir } = config;
@@ -388,7 +468,6 @@ function resolveSync(specifier, context) {
   return { url: resolvedUrl, shortCircuit: true };
 }
 export {
-  initialize,
   load,
   loadSync,
   resolve2 as resolve,
