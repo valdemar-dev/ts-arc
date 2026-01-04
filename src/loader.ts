@@ -126,6 +126,9 @@ function resolveLocalSync(baseDir: string, relativePath: string): { url: string 
     const candidates = [
         fullPath,
         fullPath + '.ts',
+        fullPath + '.mjs',
+        fullPath + '.cjs',
+        fullPath + '.js',
         fullPath + '.tsx',
         path.join(fullPath, 'index.ts'),
         path.join(fullPath, 'index.tsx'),
