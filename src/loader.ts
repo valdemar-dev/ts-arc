@@ -106,7 +106,7 @@ if (tsconfigPath) {
     const tsconfigDir = path.dirname(tsconfigPath);
     const baseUrlStr = compilerOptions.baseUrl;
 
-    config.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : null;
+    config.baseUrl = baseUrlStr ? path.resolve(tsconfigDir, baseUrlStr) : path.resolve(tsconfigDir);
     config.paths = compilerOptions.paths || {};
     config.tsconfigDir = tsconfigDir;
     config.emitDecoratorMetadata = compilerOptions.emitDecoratorMetadata || false;
