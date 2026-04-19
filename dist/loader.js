@@ -309,17 +309,17 @@ async function resolve2(specifier, context, nextResolve) {
   }
   if (specifier.startsWith("copycat://")) {
     const u = new URL(specifier);
-    const real = u.searchParams.get("real");
-    if (!real) {
-      throw "Copycat file URI is missing the `real` searchparam.";
+    const as = u.searchParams.get("as");
+    if (!as) {
+      throw "Copycat file URI is missing the `as` searchparam.";
     }
     const virtual = u.pathname;
-    const realPath = path.resolve(real);
+    const asPath = path.resolve(as);
     const identity = url.pathToFileURL(
       path.resolve(virtual)
     ).href;
     const out = new URL(identity);
-    out.searchParams.set("real", realPath);
+    out.searchParams.set("as", asPath);
     return {
       url: out.href,
       shortCircuit: true
@@ -388,7 +388,7 @@ function loadSync(urlStr, context, nextLoadSync) {
     const u = new URL(urlStr);
     const real = u.searchParams.get("real");
     if (!real) throw new Error("Copycat file uri missing real path");
-    const code = fs.readFileSync(real, "utf8");
+    const code = fs.readFileSync(u.pathname, "utf8");
     return {
       format: "module",
       source: code,
