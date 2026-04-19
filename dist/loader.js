@@ -384,10 +384,8 @@ async function load(urlStr, context, nextLoad) {
   });
 }
 function loadSync(urlStr, context, nextLoadSync) {
-  if (urlStr.startsWith("file://") && urlStr.includes("real=")) {
+  if (urlStr.startsWith("copycat://")) {
     const u = new URL(urlStr);
-    const real = u.searchParams.get("real");
-    if (!real) throw new Error("Copycat file uri missing real path");
     const code = fs.readFileSync(u.pathname, "utf8");
     return {
       format: "module",

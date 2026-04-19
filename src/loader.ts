@@ -438,11 +438,8 @@ export function loadSync(
     context: { format?: string },
     nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
-    if (urlStr.startsWith("file://") && urlStr.includes("real=")) {
+    if (urlStr.startsWith("copycat://")) {
         const u = new URL(urlStr);
-
-        const real = u.searchParams.get("real");
-        if (!real) throw new Error("Copycat file uri missing real path");
 
         const code = fs.readFileSync(u.pathname, "utf8");
 
