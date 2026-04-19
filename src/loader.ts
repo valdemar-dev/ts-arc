@@ -335,8 +335,23 @@ export async function resolve(
     nextResolve: (specifier: string, context: { parentURL?: string }) => Promise<{ url: string; format?: string; shortCircuit?: boolean }>
 ): Promise<{ url: string; format?: string; shortCircuit?: boolean }> {
     let parentPath = process.cwd();
+    
     if (context.parentURL) {
-        parentPath = path.dirname(url.fileURLToPath(context.parentURL));
+        const parentUrl = new URL(context.parentURL);
+
+        if (parentUrl.protocol === "file:") {
+            parentPath = path.dirname(url.fileURLToPath(parentUrl));
+        } else if (parentUrl.protocol === "copycat:") {
+            const as = parentUrl.searchParams.get("as");
+
+            if (as && typeof as === "string") {
+                parentPath = path.dirname(as);
+            } else {
+                parentPath = process.cwd();
+            }
+        } else {
+            parentPath = process.cwd();
+        }
     }
 
     if (specifier.startsWith("copycat://")) {
