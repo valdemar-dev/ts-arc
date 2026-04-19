@@ -311,13 +311,11 @@ async function resolve2(specifier, context, nextResolve) {
     const u = new URL(specifier);
     const as = u.searchParams.get("as");
     if (!as) {
-      throw "Copycat file URI is missing the `as` searchparam.";
+      throw new Error("Copycat file URI is missing the `as` searchparam.");
     }
     const asPath = path.resolve(as);
-    const identity = url.pathToFileURL(
-      asPath
-    ).href;
-    const out = new URL(identity);
+    const out = new URL(specifier);
+    out.pathname = asPath;
     out.searchParams.set("as", asPath);
     return {
       url: out.href,
@@ -385,7 +383,9 @@ async function load(urlStr, context, nextLoad) {
 function loadSync(urlStr, context, nextLoadSync) {
   if (urlStr.startsWith("copycat://")) {
     const u = new URL(urlStr);
-    const code = fs.readFileSync(u.pathname, "utf8");
+    const filePath = u.pathname.startsWith("/") ? u.pathname.slice(1) : u.pathname;
+    const asPath = u.searchParams.get("as");
+    const code = fs.readFileSync(asPath || filePath, "utf8");
     return {
       format: "module",
       source: code,
