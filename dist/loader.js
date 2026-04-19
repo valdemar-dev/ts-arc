@@ -381,16 +381,19 @@ async function load(urlStr, context, nextLoad) {
   });
 }
 function loadSync(urlStr, context, nextLoadSync) {
-  if (urlStr.startsWith("copycat://")) {
+  {
     const u = new URL(urlStr);
-    const filePath = u.pathname.startsWith("/") ? u.pathname.slice(1) : u.pathname;
+    const isCopycat = u.searchParams.get("copycat") === "1";
     const asPath = u.searchParams.get("as");
-    const code = fs.readFileSync(asPath || filePath, "utf8");
-    return {
-      format: "module",
-      source: code,
-      shortCircuit: true
-    };
+    const filePath = url.fileURLToPath(u.origin + u.pathname);
+    const code = fs.readFileSync(filePath, "utf8");
+    if (isCopycat) {
+      return {
+        format: "module",
+        source: code,
+        shortCircuit: true
+      };
+    }
   }
   if (urlStr.endsWith(".ts") || urlStr.endsWith(".tsx")) {
     const esbuildLoader = urlStr.endsWith(".tsx") ? "tsx" : "ts";

@@ -433,22 +433,24 @@ export function loadSync(
     context: { format?: string },
     nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
-    if (urlStr.startsWith("copycat://")) {
+    // handle our copycat scheme
+    {
         const u = new URL(urlStr);
 
-        const filePath = u.pathname.startsWith("/")
-            ? u.pathname.slice(1)
-            : u.pathname;
-
+        const isCopycat = u.searchParams.get("copycat") === "1";
         const asPath = u.searchParams.get("as");
 
-        const code = fs.readFileSync(asPath || filePath, "utf8");
+        const filePath = url.fileURLToPath(u.origin + u.pathname);
 
-        return {
-            format: "module",
-            source: code,
-            shortCircuit: true
-        };
+        const code = fs.readFileSync(filePath, "utf8");
+
+        if (isCopycat) {
+            return {
+                format: "module",
+                source: code,
+                shortCircuit: true
+            };
+        }
     }
 
     if (urlStr.endsWith('.ts') || urlStr.endsWith('.tsx')) {
