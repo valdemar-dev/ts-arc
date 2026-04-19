@@ -420,12 +420,12 @@ export function loadSync(
     context: { format?: string },
     nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
-    if (urlStr.startsWith("elegance://")) {
+    if (urlStr.startsWith("copycat://")) {
         const u = new URL(urlStr);
 
         const real = u.searchParams.get("real");
         if (!real) {
-            throw new Error("elegance:// missing real source path");
+            throw new Error("copycat:// missing real source path");
         }
 
         const filePath = path.resolve(real);

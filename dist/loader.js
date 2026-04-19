@@ -372,11 +372,11 @@ async function load(urlStr, context, nextLoad) {
   });
 }
 function loadSync(urlStr, context, nextLoadSync) {
-  if (urlStr.startsWith("elegance://")) {
+  if (urlStr.startsWith("copycat://")) {
     const u = new URL(urlStr);
     const real = u.searchParams.get("real");
     if (!real) {
-      throw new Error("elegance:// missing real source path");
+      throw new Error("copycat:// missing real source path");
     }
     const filePath = path.resolve(real);
     let rawSource = fs.readFileSync(filePath, "utf8");
