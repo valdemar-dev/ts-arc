@@ -339,6 +339,13 @@ export async function resolve(
         parentPath = path.dirname(url.fileURLToPath(context.parentURL));
     }
 
+    if (specifier.startsWith("copycat://")) {
+        return {
+            url: specifier,
+            shortCircuit: true
+        };
+    }
+
     if (specifier.startsWith('file://')) {
         const filePath = url.fileURLToPath(specifier);
         const dir = path.dirname(filePath);
@@ -413,6 +420,28 @@ export function loadSync(
     context: { format?: string },
     nextLoadSync: (url: string, context: { format?: string }) => { format: string; source?: string | Buffer; shortCircuit?: boolean }
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
+    if (urlStr.startsWith("elegance://")) {
+        const u = new URL(urlStr);
+
+        const real = u.searchParams.get("real");
+        if (!real) {
+            throw new Error("elegance:// missing real source path");
+        }
+
+        const filePath = path.resolve(real);
+        let rawSource = fs.readFileSync(filePath, "utf8");
+
+        if (config.emitDecoratorMetadata) {
+            rawSource = addMetadataDecorators(rawSource);
+        }
+
+        return {
+            format: "module",
+            source: rawSource,
+            shortCircuit: true
+        };
+    }
+
     if (urlStr.endsWith('.ts') || urlStr.endsWith('.tsx')) {
         const esbuildLoader: 'ts' | 'tsx' = urlStr.endsWith('.tsx') ? 'tsx' : 'ts';
         const filePath = url.fileURLToPath(urlStr);
