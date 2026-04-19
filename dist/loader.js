@@ -308,8 +308,20 @@ async function resolve2(specifier, context, nextResolve) {
     parentPath = path.dirname(url.fileURLToPath(context.parentURL));
   }
   if (specifier.startsWith("copycat://")) {
+    const u = new URL(specifier);
+    const real = u.searchParams.get("real");
+    if (!real) {
+      throw "Copycat file URI is missing the `real` searchparam.";
+    }
+    const virtual = u.pathname;
+    const realPath = path.resolve(real);
+    const identity = url.pathToFileURL(
+      path.resolve(virtual)
+    ).href;
+    const out = new URL(identity);
+    out.searchParams.set("real", realPath);
     return {
-      url: specifier,
+      url: out.href,
       shortCircuit: true
     };
   }
@@ -372,20 +384,14 @@ async function load(urlStr, context, nextLoad) {
   });
 }
 function loadSync(urlStr, context, nextLoadSync) {
-  if (urlStr.startsWith("copycat://")) {
+  if (urlStr.startsWith("file://") && urlStr.includes("real=")) {
     const u = new URL(urlStr);
     const real = u.searchParams.get("real");
-    if (!real) {
-      throw new Error("copycat:// missing real source path");
-    }
-    const filePath = path.resolve(real);
-    let rawSource = fs.readFileSync(filePath, "utf8");
-    if (config.emitDecoratorMetadata) {
-      rawSource = addMetadataDecorators(rawSource);
-    }
+    if (!real) throw new Error("Copycat file uri missing real path");
+    const code = fs.readFileSync(real, "utf8");
     return {
       format: "module",
-      source: rawSource,
+      source: code,
       shortCircuit: true
     };
   }
