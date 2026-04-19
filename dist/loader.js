@@ -313,10 +313,9 @@ async function resolve2(specifier, context, nextResolve) {
     if (!as) {
       throw "Copycat file URI is missing the `as` searchparam.";
     }
-    const virtual = u.pathname;
     const asPath = path.resolve(as);
     const identity = url.pathToFileURL(
-      path.resolve(virtual)
+      asPath
     ).href;
     const out = new URL(identity);
     out.searchParams.set("as", asPath);
