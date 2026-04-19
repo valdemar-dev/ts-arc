@@ -309,14 +309,15 @@ async function resolve2(specifier, context, nextResolve) {
   }
   if (specifier.startsWith("copycat://")) {
     const u = new URL(specifier);
-    const as = u.searchParams.get("as");
-    if (!as) {
-      throw new Error("Copycat file URI is missing the `as` searchparam.");
+    const real = u.searchParams.get("real");
+    if (!real) {
+      throw new Error("Copycat file URI is missing the `real` searchparam.");
     }
-    const asPath = path.resolve(as);
+    const realPath = path.resolve(real);
     const out = new URL(specifier);
-    out.pathname = asPath;
-    out.searchParams.set("as", asPath);
+    out.pathname = realPath;
+    out.searchParams.set("real", realPath);
+    out.searchParams.set("copycat", "true");
     return {
       url: out.href,
       shortCircuit: true
@@ -381,19 +382,18 @@ async function load(urlStr, context, nextLoad) {
   });
 }
 function loadSync(urlStr, context, nextLoadSync) {
-  {
-    const u = new URL(urlStr);
-    const isCopycat = u.searchParams.get("copycat") === "1";
-    const asPath = u.searchParams.get("as");
-    const filePath = url.fileURLToPath(u.origin + u.pathname);
-    const code = fs.readFileSync(filePath, "utf8");
-    if (isCopycat) {
-      return {
-        format: "module",
-        source: code,
-        shortCircuit: true
-      };
+  const u = new URL(urlStr);
+  if (u.searchParams.has("copycat")) {
+    const real = u.searchParams.get("real");
+    if (!real) {
+      throw new Error("Copycat file URI is missing the `real` searchparam.");
     }
+    const code = fs.readFileSync(decodeURI(real), "utf8");
+    return {
+      format: "module",
+      source: code,
+      shortCircuit: true
+    };
   }
   if (urlStr.endsWith(".ts") || urlStr.endsWith(".tsx")) {
     const esbuildLoader = urlStr.endsWith(".tsx") ? "tsx" : "ts";
