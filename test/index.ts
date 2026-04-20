@@ -1,3 +1,7 @@
-import { testVariable } from "@testDir/testFile";
+console.log(process.execArgv)
 
-console.log(testVariable);
+type Thing = {
+    name: string;
+}
+
+throw new Error("hi");

@@ -120,7 +120,7 @@ async function loadModule(scriptUrl) {
   const scriptPath = url.fileURLToPath(scriptUrl);
   setArcTsConfig(path.dirname(scriptPath));
   registerLoader();
-  import(scriptUrl).catch((err) => {
+  await import(scriptUrl).catch((err) => {
     console.error(err);
     process.exit(1);
   });
