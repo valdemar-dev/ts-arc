@@ -138,7 +138,9 @@ export async function setArcTsConfig(directory: string) {
 
 export async function loadModule(scriptUrl: string) {
     const scriptPath = url.fileURLToPath(scriptUrl);
+    
     setArcTsConfig(path.dirname(scriptPath));
     registerLoader();
-    import(scriptUrl).catch(err => { console.error(err); process.exit(1); });
+
+    await import(scriptUrl).catch(err => { console.error(err); process.exit(1); });
 }
