@@ -342,13 +342,7 @@ export async function resolve(
         if (parentUrl.protocol === "file:") {
             parentPath = path.dirname(url.fileURLToPath(parentUrl));
         } else if (parentUrl.protocol === "copycat:") {
-            const as = parentUrl.searchParams.get("as");
-
-            if (as && typeof as === "string") {
-                parentPath = path.dirname(as);
-            } else {
-                parentPath = process.cwd();
-            }
+            parentPath = path.dirname(parentUrl.pathname);
         } else {
             parentPath = process.cwd();
         }
