@@ -348,6 +348,8 @@ export async function resolve(
         }
     }
 
+    // if you import using copycat it'll pretend to be a different file,
+    // module resolution still makes it out to be a file:// uri though
     if (specifier.startsWith("copycat://")) {
         const u = new URL(specifier);
 
@@ -356,13 +358,13 @@ export async function resolve(
             throw new Error("Copycat file URI is missing the `real` searchparam.");
         }
 
-        const realPath = path.resolve(real);
+        // the pretend path is the copycat URL's pathname
+        const pretendPath = path.resolve(u.pathname);
+        const fileUrl = url.pathToFileURL(pretendPath).href;
 
-        const out = new URL(specifier);
-        out.pathname = realPath;
-        out.searchParams.set("real", realPath);
-        out.searchParams.set("copycat", "true")
-
+        const out = new URL(fileUrl);
+        out.searchParams.set("copycat", "true");
+        out.searchParams.set("real", real);
         return {
             url: out.href,
             shortCircuit: true
@@ -445,16 +447,14 @@ export function loadSync(
 ): { format: string; source?: string | Buffer; shortCircuit?: boolean } {
     const u = new URL(urlStr);
 
-    // handle our copycat scheme
+    // serve the real file when the URL has the copycat flag
     if (u.searchParams.has("copycat")) {
-        const real = u.searchParams.get("real");
-
-        if (!real) {
+        const realEncoded = u.searchParams.get("real");
+        if (!realEncoded) {
             throw new Error("Copycat file URI is missing the `real` searchparam.");
         }
-
-        const code = fs.readFileSync(decodeURI(real), "utf8");
-
+        const realPath = decodeURIComponent(realEncoded);
+        const code = fs.readFileSync(realPath, "utf8");
         return {
             format: "module",
             source: code,
