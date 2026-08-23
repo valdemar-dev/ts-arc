@@ -133,8 +133,9 @@ function resolveBareSync(specifier, parentPath) {
   const requireFromParent = createRequire(path.join(parentPath, "index.js"));
   try {
     const resolved = requireFromParent.resolve(specifier);
-    if (resolved === specifier && builtinModules.includes(specifier.replace(/^node:/, ""))) {
-      return `node:${specifier.replace(/^node:/, "")}`;
+    if (resolved === specifier) {
+      const bare = specifier.replace(/^node:/, "");
+      if (builtinModules.includes(bare) || builtinModules.includes(`node:${bare}`)) return `node:${bare}`;
     }
     return url.pathToFileURL(resolved).href;
   } catch (e) {
@@ -396,9 +397,25 @@ function loadSync(urlStr, context, nextLoadSync) {
       throw new Error("Copycat file URI is missing the `real` searchparam.");
     }
     const realPath = decodeURIComponent(realEncoded);
+    const ext = path.extname(realPath).toLowerCase();
+    if (ext === ".ts" || ext === ".tsx") {
+      const { code: code2 } = transformSync(fs.readFileSync(realPath, "utf8"), {
+        loader: ext === ".tsx" ? "tsx" : "ts",
+        format: "esm",
+        target: `node${process.versions.node}`,
+        sourcemap: "inline",
+        sourcefile: realPath
+      });
+      return {
+        format: "module",
+        source: code2,
+        shortCircuit: true
+      };
+    }
     const code = fs.readFileSync(realPath, "utf8");
+    const format = ext === ".cjs" ? "commonjs" : "module";
     return {
-      format: "module",
+      format,
       source: code,
       shortCircuit: true
     };
